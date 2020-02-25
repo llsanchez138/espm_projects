@@ -14,7 +14,7 @@ library("dplyr")
 library("ggmap")
 library("patchwork")
 library("plotly")
-#library("gganimate")
+
 
 ```
 
@@ -25,7 +25,7 @@ Below a registered key from google maps is uploaded for future use.
 
 ```{r}
 #setting up google
-ggmap::register_google(key = "AIzaSyD6dGThOuUGa4uh8IXNmQlFpo7fApjhoDY")
+ggmap::register_google(key = "xxxxxxxxxxxxxxxxxxx")
 
 ```
 
