@@ -1,0 +1,166 @@
+---
+title: "Habitat for the Spiny Lumpsucker"
+author: "Latosha Sanchez & Faye Romero | ESPM 157 | Nov 1, 2019"
+output: github_document
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(messages = FALSE, cache = FALSE)
+```
+
+# INTRODUCTION
+
+This module is inspired by a recent paper in Nature Ecology and Evolution, [**Mapping the global potential for marine aquaculture**](https://www.nature.com/articles/s41559-017-0257-9). The authors 
+used multiple constraints including ship traffic, dissolved oxygen, bottom depth
+and more, to limit and map areas suitable for aquaculture.
+
+![](./images/aquaculture_map.png)
+
+We are going to use a similar, but much more simplified approach here. 
+We will map potential areas of marine aquaculture for the super cute Pacific spiny lumpsucker (*Eumicrotremus orbis*)
+
+![They have adhesive pelvic disks! How cute!](./images/lumpsucker.png)
+
+To do this we are going to need the following spatial data:  
+
+**1. Sea Surface Temperature** (raster data)  
+**2. Net Primary Productivity** (raster data)  
+**3. Marine Protected Areas**  (vector data)  
+
+```{r libraries, include= FALSE}
+install.packages("tmap")
+library(mapview)      #interactive maps, raster + vector layers
+library(raster)       #Main raster library
+library(tidyverse)    #our old friend
+library(sf)           #to work with simple features data
+library(tmap)         #won't work on travis?
+
+```  
+
+So to figure out where we might find the lumpsucker fish, we need to know a little
+about it!
+
+From [NOAA's species description](http://www.nmfs.noaa.gov/speciesid/fish_page/fish68a.html):
+
+> A lot of people who see Pacific spiny lumpsuckers for the first time describe them as a ping-pong ball with fins. They are tiny and very inefficient swimmers, found most often in kelp or eelgrass beds attached to a rock or a log no deeper than 500 feet. They are quite common, ranging from the waters off the Washington coast, up around the arc of the Aleutian Islands, to the Asian mainland and the northern islands of Japan, and in the Bering Sea. A giant Pacific spiny lumpsucker is five inches long, but most are closer to an inch. Scuba divers are their biggest fans because the little fellows will eat right out of their hands.
+
+There are 3 key criteria for optimal lumpsucker growth:  
+
+- Habitat within a marine protected area
+- Sea surface temperatures between **12 and 18 degrees Celsius**  
+- Net Primary Productivity between **2.6 and 3 mgC/m2/day**
+
+------
+
+# ASSIGNMENT
+
+**Create a map which shows the acceptable habitat for the Spiny Lumpsucker!**  
+We will use the 3 key criteria listed above to create a layered figure.
+
+## CRITERIA 1: Marine Protected Areas ##
+
+```{r}
+#Reading in marine protected area data
+mpas <- sf::read_sf("shapefiles/mpas_westcoast.shp")
+mpas
+```
+
+```{r}
+#Graphing marine protected area data
+mpas %>% ggplot() + geom_sf(aes(col=State))
+mpas
+```
+
+```{r}
+#Narrowing down:
+#Graphing Commercial and Recreational Prohibited Fishing Areas only
+restricted <- mpas %>%
+  filter(Fish_Rstr %in%
+           c("Commercial and Recreational Fishing Prohibited")) %>%
+  filter(Mgmt_Plan %in% c("MPA Programmatic Management Plan")) %>%
+  filter(Constancy %in% c("Year-round"))
+
+restricted %>%
+  ggplot() +
+  geom_sf(aes(col = Fish_Rstr),
+          color = "blue") +
+  theme_bw() +
+  labs(title = "Commercial and Recreational\nProhibited Fishing Areas") +
+  theme(plot.title = element_text(size = "15", face = "bold"))
+```
+
+## CRITERIA 2: Annual Sea Surface Temperature 
+
+```{r}
+#Uploading raster of annual sea surface temp
+avg_an12 <- raster("rasters/average_annual_sst_2012.tif")
+```
+
+```{r}
+#First, we must convert Kelvin to Celcius.
+kelvin_to_cel <- function(tempk) {
+  celsius <- (tempk - 273.15)
+  return(celsius)
+}
+
+#Then, let's graph only the annual sea surface temperature for 2012.
+avg_12 <- tm_shape(restricted) +
+  tm_polygons()
+
+avg_12 <- tm_shape(kelvin_to_cel(avg_an12)) +
+  tm_raster(palette = terrain.colors(10))
+
+avg_12
+```
+
+## CRITERIA 3: Annual Net Primary Productivity (NPP)
+
+```{r}
+#Uploading raster of annual NPP
+annual_npp <- raster("rasters/annual_npp.tif")
+```
+
+```{r}
+#Graphing NPP.. units are mgC/m2/day
+an_npp <- tm_shape(annual_npp) +
+tm_raster()
+
+an_npp
+```
+
+## Compiling all the data
+
+Reminder: these are the 3 criteria needed for optimal lumpsucker habitat:
+
+- Habitat within a marine protected area
+- Sea surface temperatures between **12 and 18 degrees Celsius**  
+- Net Primary Productivity between **2.6 and 3 mgC/m2/day**
+
+
+```{r}
+#Marine protected areas
+marine_pa <- tm_shape(restricted) +
+  tm_polygons()
+
+#Avg annual sea surface temp for 2012
+avg_12 <- tm_shape(kelvin_to_cel(avg_an12)) +
+  tm_raster(palette = terrain.colors(10)) + 
+  marine_pa
+
+#Adding graphing annual NPP
+final_figure <- tm_shape(annual_npp) +
+  tm_raster() +
+  tm_layout(title = "Habitat of Spiny Lumpsucker",
+            legend.outside = TRUE) +
+  marine_pa + avg_12
+
+final_figure
+```
+
+
+## CONCLUSIONS
+
+Our goal was to create a figure that clearly depicted the areas in which all three criteria were met - Marine protected areas, annual sea surface temperature, and primary productivity between 2.6 and 3 mgC/m2/day. These areas would have been highlighted while all other areas were dulled out. Rather, we were able to narrow our findings to zone in on marine protected areas, make the appropriate conversions on temperature data, and layer three rasters. Unfortunately, we were unable to create our ideal figure as we only reached the point of layering the three rasters. We encountered various problems with tmap, including difficulties with layering rasters: 1) we couldn't incorporate all years of sea surface temperature data, only the data from 2012, 2) we had difficulties with the visualization of the figure and 3) the Marine Protected Area(s) in our final figure were difficult to show because it was hidden between the other two layers and we were unable to incorporate the data on the graph. However, were able to re-layer the new raster, such that the acceptable areas for the fish to live are denoted by the small grey points on the map.
+
+Raster/vector data and mapping packages are evidently very useful in compiling environmental data. It allows users to quickly and easily view information, create links between often-complicated data, and communicate ideas to other researchers and the public. This is extremely important when trying to convey scientific concepts to the public in accessible ways.

@@ -1,0 +1,323 @@
+---
+title: "Coral Bleaching"
+author: "Latosha Sanchez"
+output:
+  pdf_document: default
+  html_document: default
+maketitle: yes
+---
+```{r message=FALSE, echo=FALSE, results='hide'}
+#if (!requireNamespace("devtools")) install.packages("devtools")
+#devtools::install_github("dkahle/ggmap")
+library("tidyverse")
+library("dplyr")
+library("ggmap")
+library("patchwork")
+library("plotly")
+#library("gganimate")
+
+```
+
+
+Coral reefs have been in decline for a number of years. Damaging activities such as coral mining and blast fishing are examples of these. Climate change has been an ongoing issue and it is believed to be another contributor to the decline in coral reefs through what is called coral bleaching. Healthy coral are known to be bright and vibrant colors, and a crucial host to the diversity of the many tropical species that live among them. Coral live in a mutually beneficial relationship with zooxanthellae, a type of microscopic algae that gives coral its colors. However, changes to the environment can put undue stress on the coral, causing them to forgo their relationship and expel the algae in its system. Without the zooxanthellae, the coral becomes white. This process is known as coral bleaching. If the abrupt change that occured remains, the coral will continue to whither and die. A warming ocean due to climate change, is one of the biggest stressors coral reefs face. 
+
+Below a registered key from google maps is uploaded for future use.
+
+```{r}
+#setting up google
+ggmap::register_google(key = "AIzaSyD6dGThOuUGa4uh8IXNmQlFpo7fApjhoDY")
+
+```
+
+To begin, I will take a look at past data for Australia, to identify the severity of bleaching being faced, as well as the percentage of the coral that has been affected by bleaching. 
+```{r}
+
+#dataset for Australia
+coral_bleaching <-
+read.csv(file= file.path("CoralBleaching (1).csv"), header = TRUE)
+head(coral_bleaching, 2)
+
+
+```
+
+I will then filtered out the desired attributes and compose a histogram to show the severity in bleaching based on the given years from the dataset for Australia. 
+
+```{r}
+australia_df <- data.frame(coral_bleaching) %>%
+  dplyr::select(YEAR,
+                REGION,
+                LAT,
+                LON,
+                BLEACHING_SEVERITY,
+                PERCENTAGE_AFFECTED)
+
+hist_australia <- australia_df %>%
+  ggplot() +
+  geom_histogram(aes(x = YEAR,
+                     fill = BLEACHING_SEVERITY),
+                 breaks = seq(1995, 2012, 2)) + 
+  theme_bw()
+hist_australia
+```
+
+
+
+By sorting through the data, I am able to remove incomplete data and keep what is necessary.
+Below is the tidying being done for the data. This will help us to take a look at coral reef decline by bleaching, in which the severity known is identified, as well as the percentage of the coral that has been affected.
+
+The table below further omits the rows without data and converts the percentage affected into like terms for easier comparison.
+
+```{r} 
+#australia tidying
+coral_df <- data.frame(coral_bleaching) %>%
+  dplyr::select(YEAR,
+                REGION,
+                LAT,
+                LON,
+                BLEACHING_SEVERITY,
+                PERCENTAGE_AFFECTED) %>%
+  filter(BLEACHING_SEVERITY == c("HIGH", "Medium", "Low")) %>%
+  na.omit(PERCENTAGE_AFFECTED, invert = FALSE) %>%
+  mutate(PERCENTAGE_AFFECTED = as.numeric(sub("%", "", PERCENTAGE_AFFECTED, fixed =
+                                                TRUE))) %>% na.omit()
+head(coral_df, 5)
+
+```
+
+To map the amount of affected coral reef, I select only those reefs that have low, medium, or high levels of severity.
+```{r}
+
+#Filtering of Australia's "coral_df" for mapping
+australia_df_without <- australia_df %>% 
+  filter(BLEACHING_SEVERITY == c("HIGH", "Medium", "Low"))
+
+p <- ggmap(get_googlemap(
+  center = c(lon = 135, lat = -23),
+  zoom = 4,
+  scale = 1,
+  maptype = 'terrain',
+  color = 'color'
+))
+
+australia_map <- p + 
+  geom_point(
+    data = australia_df_without,
+    aes(x = LON, y = LAT, col = "LON"),
+    color = "orangered",
+    size = 1
+  ) +
+  theme(legend.position = "bottom")
+
+#showing a zoomed in section of Australia
+n_aus <-
+  ggmap(get_googlemap(
+    center = c(lon = 145.57, lat = -15.589),
+    zoom = 6,
+    scale = 4,
+    maptype = 'terrain',
+    color = 'color'
+  )) 
+
+aus_zoomed <-
+  n_aus + geom_point(
+    data = australia_df_without,
+    aes(x = LON, y = LAT, col = BLEACHING_SEVERITY),
+    #color = "purple",
+    size = 1
+  ) +
+  labs(caption = "The above points are reefs experiencing coral bleaching in Australia",
+       title = "Severity of Coral Bleaching in Australia")
+  
+
+australia_map + aus_zoomed
+```
+
+
+After analyzing the dataset for Australia, I will look at the global data for coral reef bleaching. 
+```{r}
+#introducing dataset for global analysis
+
+cb_global <-
+read.csv(file=file.path("CoralBleaching.csv"), header = TRUE,
+           na.strings = c("", "NA"))
+head(cb_global, 5)
+```
+
+Below is a side comparison of the annual levels of bleaching in the global and Australia datasets. 
+```{r}
+#histogram for global df
+
+hist_global <- cb_global %>% ggplot() +
+  geom_histogram(aes(x = YEAR, fill = BLEACHING_SEVERITY), breaks = seq(1985, 2012, 2)) +
+  theme_bw() +
+  labs(title = "Counts of Bleaching Severity Globally by Year")
+
+#comparing global and australia's histograms for bleach severity over time
+hist_global
+hist_australia
+```
+Visually, there is a higher count seen in 1998 and 2002 compared to other years. Further analysis of the data may provide useful.  
+
+
+The calculations below are made from the total global counts from 1988-2010.
+```{r}
+
+#finding variations in global data reported per year
+unk <- sum(cb_global$BLEACHING_SEVERITY == "Severity Unknown")
+low <- sum(cb_global$BLEACHING_SEVERITY == "Low")
+med <- sum(cb_global$BLEACHING_SEVERITY == "Medium")
+hi <- sum(cb_global$BLEACHING_SEVERITY == "HIGH")
+non <- sum(cb_global$BLEACHING_SEVERITY == "No Bleaching")
+
+#number of data points with known or unknown levels of bleaching
+severity_total_count <- sum(unk + low + med + hi + non)
+
+#creating percentages for each level of severity
+prop_unk <- sum(unk / severity_total_count)
+prop_low <- sum(low / severity_total_count)
+prop_med <- sum(med / severity_total_count)
+prop_hi <- sum(hi / severity_total_count)
+prop_non <- sum(non / severity_total_count)
+
+# Displays the percentage of known coral reef bleaching globally
+prop_known <- prop_low + prop_med + prop_hi + prop_non
+
+#Table displaying porportion
+prop_tbl <-
+  matrix(
+    c(
+      "Unknown",
+      prop_unk,
+      "Low",
+      prop_low,
+      "Medium",
+      prop_med,
+      "High",
+      prop_hi,
+      "None",
+      prop_non
+    ),
+    ncol = 2,
+    byrow = TRUE
+  )
+colnames(prop_tbl) <-
+  c("Bleaching_Severity", "Proportions_Affected")
+
+prop_tbl <- as.table(prop_tbl)
+prop_tbl
+
+# % of reefs with some level of known bleaching
+bleaching <- prop_low + prop_med + prop_hi
+perc_known <-
+  str_c(
+    "Based on the global dataset, ",
+    round(bleaching, 3) ,
+    "% of coral reefs that have been affected by bleaching"
+  )
+perc_un <- str_c(round(prop_non, 3), "% of coral reefs remains unbleached")
+perc_unk <- str_c("The severity of ", round(prop_unk, 3), "% remains unknown")
+
+perc_known
+perc_un
+perc_unk
+```
+
+To further analyze the global data, we tidy the set as shown below.
+
+```{r}
+cb_df_global <- data.frame(cb_global) %>%
+  dplyr::select(YEAR,
+                REGION,
+                LAT,
+                LON,
+                BLEACHING_SEVERITY,
+                PERCENTAGE_AFFECTED) %>%
+  filter(BLEACHING_SEVERITY == c("HIGH", "Medium", "Low")) %>%
+  na.omit(PERCENTAGE_AFFECTED, invert = FALSE) %>%
+  mutate(PERCENTAGE_AFFECTED = as.numeric(sub("%",
+                                              "", 
+                                              PERCENTAGE_AFFECTED, 
+                                              fixed = TRUE))) %>% 
+  na.omit()
+
+
+```
+
+The graph below depicts the percentage of coral reefs that have been affected by bleaching. It is further sorted and separated by region and year. It can be seen, that since 2000, there has been a significant increase in the number of coral reefs affected by bleaching. 
+```{r}
+global_by_year <- cb_df_global %>%
+  dplyr::select(YEAR, REGION, LAT, LON, PERCENTAGE_AFFECTED, BLEACHING_SEVERITY)
+
+global_plot_by_year <-
+  ggplot(global_by_year, aes(YEAR, PERCENTAGE_AFFECTED, color = REGION)) +
+  geom_jitter(shape = 1) + 
+  theme_bw() +
+  labs(
+    title = "Percentage of Coral Reef Bleaching by Region",
+    y = "Percentage Affected",
+    x = "Year",
+    legend = "Region"
+  ) 
+
+ggplotly(global_plot_by_year)
+
+
+```
+
+The interactive map below identifies the location and severity of each known coral reef bleaching from the dataset. 
+```{r}
+p <- ggmap(get_googlemap(
+  center = c(lon = -20, lat = 23),
+  zoom = 1,
+  scale = 4,
+  maptype = 'terrain',
+  color = 'color'
+))
+
+year_global <-
+  p + geom_point(data = global_by_year,
+                 aes(
+                   x = LON, 
+                   y = LAT, 
+                   color = BLEACHING_SEVERITY),
+                 size = 1, 
+                 shape = 1) + 
+  labs(
+    title = "Global Coral Bleaching by Severity", 
+    color = "Severity") +
+   theme(
+    plot.title = element_text(size = 18, 
+                              face = 'bold', 
+                              color = 'steelblue4'))
+year_global
+
+ggplotly(
+  year_global,
+  width = 680,
+  height = 450,
+  dynamicTicks = TRUE
+)
+
+```
+
+## Conclusion
+The information gathered and analyzed depicts the effects of coral bleaching has had to the many coral reefs across the globe. Human involvement, climate change, and natural disasters all have an effect on coral reefs. While the data I analyzed does not take a direct look at the cause, it is clear that coral reefs have been greatly impacted by coral bleaching. From what can be seen on the maps above, a large percentage of the coral reefs affected are those that are along the equator and within close proximity to populated land. 
+
+I acquired both datasets used through ReefBase and I focused on information that included the date, location, severity, and cause. After I analyzed the data for Australia, I decided to do the same with a global dataset. I originally wanted to compare the locational sea surface temperature (sst) to coral bleaching, but I was unable to find datasets that included the annual change in sst (or climate) in addition to the lon/lat to map it myself. 
+
+In the future, I believe it would be beneficial to look closely at the counts of bleached coral reefs per region. This information may better explain the variation in the histogram. Furthermore, the data compiled here can prove useful when paired with causes such as, blast fishing, environmental changes including weather patterns, CO2 level changes, etc. 
+
+## References 
+
+Hancock, Lorin. "Everything You Need to Know about Coral Bleaching—And How We Can Stop it." World Wildlife
+  Fund. N.p., 2016. URL https://www.worldwildlife.org/pages/everything-you-need-to-know-about-coral-bleaching-a
+  -and -how-we-can-stop-it
+  
+Information and data provided by ReefBase (http://www.reefbase.org)
+  ReefBase: A Global Information System for Coral Reefs. December, 2019. http://www.reefbase.org
+
+"Environmental issues with coral reefs" Wikipedia: The Free Encyclopedia. Wikimedia Foundation, Inc. 22 July    2004. URL https://en.wikipedia.org/wiki/Environmental_issues_with_coral_reefs
+
+ggmap reference:
+  D. Kahle and H. Wickham. ggmap: Spatial Visualization with ggplot2. The R Journal,
+  5(1), 144-161. URL http://journal.r-project.org/archive/2013-1/kahle-wickham.pdf

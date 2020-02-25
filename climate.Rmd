@@ -1,0 +1,273 @@
+---
+title: "Module 1: Climate Change"
+author: "Latosha Sanchez"
+output: github_document
+---
+
+
+```{r message=FALSE, echo=FALSE, results='hide'}
+library(tidyverse)
+
+if(!file.exists("co2_mm_mlo.txt"))
+  download.file("ftp://aftp.cmdl.noaa.gov/products/trends/co2/co2_mm_mlo.txt", "co2_mm_mlo.txt" )
+
+co2 <-readr::read_table("co2_mm_mlo.txt", 
+                 na = c("-1", "-99.99"), 
+                 comment = "#", 
+                 col_names = c("Year", "Month", "Decimal_Date", "Average", "Interpolated", "Trend")) 
+
+
+co2
+```
+
+# Avg CO2 measurements (parts per million) & trend from 1958-present  
+
+
+```{r message=FALSE, echo=FALSE, results='hide'}
+
+co2 %>%
+  gather(series, co2_conc, Average, Interpolated, Trend)
+
+co2 %>% ggplot(aes(x = Decimal_Date)) + 
+  geom_line(aes(y = Average, color = "Avg CO2 measurements"), lwd = 0.75) +
+  
+  geom_line(aes(y = Trend, color = "Trend"), lwd = 0.85) + 
+  
+  scale_color_manual(values = c("skyblue","orangered1")) +
+  labs(
+    title = "Averages in CO2 Measurements: 1958 - Present",
+       x = "Year",
+       y = "CO2 (parts per million)"
+    ) +
+  theme(plot.title = element_text(size = 20, color = "grey21", face = "bold"),
+    axis.text.x =
+      element_text(size = 12),
+    axis.text.y =
+      element_text(size = 10),
+    axis.title.x =
+      element_text(size = 14, face = "bold", color = "grey25"),
+    axis.title.y =
+      element_text(size = 14, face = "bold", color = "grey25")) +
+  theme_bw() +
+  labs(colour = "") 
+ 
+```  
+```{r}
+co2 %>% filter(Year >= "1985", Year <= "2010") %>%
+  ggplot(aes(x = Decimal_Date)) + 
+  geom_line(aes(y = Average, color = "Avg CO2 measurements"), lwd = 0.75) +
+  
+  geom_line(aes(y = Trend, color = "Trend"), lwd = 0.85)
+```
+
+
+
+# Variations in the annual average global temperature over the past century
+
+```{r  message=FALSE, echo=FALSE, results='hide'}
+
+gtemp <- "https://data.giss.nasa.gov/gistemp/graphs/graph_data/Global_Mean_Estimates_based_on_Land_and_Ocean_Data/graph.txt"
+
+
+global_temp <-
+  read_table(
+    gtemp,
+    skip = 5,
+    col_names = c("Year", "No_Smoothing", "Lowess")
+  ) %>% gather(Smoothing, Temp, Lowess, No_Smoothing)
+
+
+global_temp %>% ggplot (aes(x = Year))  + 
+  geom_point(aes(y = Temp), color = "orange", position = "jitter") + 
+  labs(title = 'Annual Average Global Temperature', x = "Year", y = "Temperature") + 
+  theme_bw() + 
+  theme(plot.title=element_text(size=18, face="bold"), 
+                  axis.text.x=element_text(size=10), 
+                  axis.text.y=element_text(size=10),
+                  axis.title.x=element_text(size=13),
+                  axis.title.y=element_text(size=13)) 
+
+
+
+
+
+
+```
+
+
+While there are frequent increasing/decreasing patterns shown, overall, the global mean is increasing over time more than the fluctuations noticed between short-term time points.
+
+
+
+# Melting Ice Sheets
+
+- Data description: <http://climate.nasa.gov/vital-signs/land-ice/>
+- Raw data file: <http://climate.nasa.gov/system/internal_resources/details/original/499_GRN_ANT_mass_changes.csv>
+
+```{r message=FALSE, echo=FALSE, results='hide'}
+
+ice <- read.csv(file = "~/Documents/espm-157/climate-llsanchez138/assignment/GRN_ART_Changes.csv", 
+                header = TRUE, 
+                skip = 10, 
+                col.names = c("Time", "Greenland_mass", "Antarctica_mass"))
+
+ice %>% ggplot(aes(x = Time)) + 
+  geom_line(aes(y = Greenland_mass, 
+                color = "Greenland_mass"), 
+                lwd = 1) +
+  
+  geom_line(aes(y = Antarctica_mass, 
+                color = "Antarctica_mass"),
+                lwd = 1) +
+  
+  labs(title = "Ice Mass Variation in Antarctica & Greenland \n2002-2005", 
+       x = "Time (Decimal Date)", 
+       y = "Land Mass (Gt)",
+       caption = "Data Source: Mass measurements by\nNASA's GRACE satellites") + 
+  theme_bw() +
+  scale_color_manual(name = "", 
+                     guide = "legend", 
+                     values = c("Antarctica_mass" = "skyblue3", "Greenland_mass" = "green"), 
+                     labels = c("Antarctica", "Greenland")) +
+  theme(plot.title = element_text(size = 16, face = "bold"),
+        plot.caption = element_text(color = "grey27", face = "italic", hjust = 1.10))
+
+
+```
+
+
+
+# Rising Sea Levels
+
+- Data description: <http://climate.nasa.gov/vital-signs/sea-level/>
+- Raw data file: <http://climate.nasa.gov/system/internal_resources/details/original/121_Global_Sea_Level_Data_File.txt>
+
+```{r message=FALSE, echo=FALSE, results='hide'}
+sea <- read_table("http://climate.nasa.gov/system/internal_resources/details/original/121_Global_Sea_Level_Data_File.txt", 
+                  skip = 45, 
+                  col_names = c("altimeter_type", "merged_file_cycle", 
+                                "decimal_date", "observations", 
+                                "wgtd_obs", "GMSL",
+                                "std_GMSL","missing_title",
+                                "GMSL2", "std_GMSL2", 
+                                "smooth_GMSL", "smooth_GMSL2"))
+sea_level <- select(sea, -1, -2, -8)
+ ggplot(sea, aes(x = decimal_date)) + 
+        geom_line(aes(y = smooth_GMSL, 
+                      color = "GIA not applied GMSL"), lwd = 0.75) + 
+   geom_line(aes(y = smooth_GMSL2, 
+                 color = "GIA applied to GMSL"), lwd = 0.75) +
+   labs(
+        title = "Global Mean Sea Levels Over Time", 
+        x = "Year", 
+        y = "Sea Height Variation (mm)", 
+        caption = 'Data Source: Satellite sea level observations\nCredit: NASA Goddard Space Flight Center',
+        colour="") +
+   theme(
+     plot.title = element_text(size = 15, face = 'bold'),
+     plot.caption = element_text(color = 'grey27', face = 'italic' )) +
+   theme_bw()
+
+
+sea_level
+sea
+```
+
+# Arctic Sea Ice
+The area of the ocean which is covered by sea ice during a given point in time
+
+- <http://nsidc.org/data/G02135>
+- <ftp://sidads.colorado.edu/DATASETS/NOAA/G02135/north/daily/data/N_seaice_extent_daily_v3.0.csv>
+
+
+```{r , height=3, length=20, message=FALSE, echo=FALSE, results='hide'}
+n_seaice <-
+  read.csv(file =
+    "~/Documents/espm-157/climate-llsanchez138/assignment/climate_IV_seaice.csv",
+    header = TRUE,
+    skip = 2,
+    col.names = c(
+      "Year",
+      "Month",
+      "Day",
+      "Extent",
+      "missing",
+      "source_data"
+    )
+  ) %>% select(1,4)
+
+n_seaice %>% ggplot(aes(Year, Extent, color = "Sea Ice Mass")) + 
+  geom_smooth() + 
+  labs(
+       title = "Variation in Arctic Sea Ice concentration \n1978-Present", 
+       x = "Year", 
+       y = "Sea Ice Extent (10^6 sq km)") + 
+  theme(
+       plot.title = element_text(size = 18, face = "bold"),
+       axis.title.x = element_text(size=14),
+       axis.title.y = element_text(size=14),
+       axis.text.x = element_text(size=14)) +
+  theme_bw() +
+  labs(colour = "")
+ 
+
+
+
+```
+   
+
+
+# Longer term trends in CO2 Records
+
+
+The data we analyzed in the unit introduction included CO2 records dating back only as far as the measurements at the Manua Loa observatory.  To put these values into geological perspective requires looking back much farther than humans have been monitoring atmosopheric CO2 levels.  To do this, we need another approach.
+
+
+[Ice core data](http://cdiac.ornl.gov/trends/co2/ice_core_co2.html):
+
+Vostok Core, back to 400,000 yrs before present day 
+
+- Description of data set: <http://cdiac.esd.ornl.gov/trends/co2/vostok.html>
+- Data source: <http://cdiac.ornl.gov/ftp/trends/co2/vostok.icecore.co2>
+
+```{r message=FALSE, echo=FALSE, results='hide'}
+core <- read_table("http://cdiac.ornl.gov/ftp/trends/co2/vostok.icecore.co2", 
+                   skip=19) %>% separate(`(m)   (yr BP)  (yr BP)  (ppmv)`, 
+                                         into = c("Depth", "ice", "air", "co2_conc"), 
+                                         sep = "([\\?\\:\\t])")
+
+core$air <- as.numeric(core$air)
+age <- (core$air)/10000
+
+core$co2_conc <- as.numeric(core$co2_conc)
+conc <- (core$co2_conc)/100
+
+core %>% ggplot(aes(x = age)) + 
+  geom_line(aes(y=conc), color = "seagreen4") + 
+  labs(
+       title= "CO2 Concentration in Relation to Mean Air-Age \n(400,000 years before present day)", 
+       x = "Years (before present) x 10^4", 
+       y = "CO2 Concentration x 10^2",
+       caption = "Vostok Core, back to 400,000 yrs before present day") +
+  theme_bw() +
+  theme(plot.title = element_text(face = 'bold', size =18),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_text(size=12))
+
+
+
+```
+
+# References:
+
+ www.esrl.noaa.gov/gmd/ccgg/trends/
+ 
+ B. D. Beckley, N. P. Zelensky, S. A. Holmes, F. G. Lemoine, R. D. Ray, G. T. Mitchum, S. D. Desai & S. T. Brown, Assessment of the Jason-2 Extension to the TOPEX/Poseidon, Jason-1 Sea-Surface Height Time Series for Global Mean Sea Level Monitoring, Marine Geodesy, Vol 33, Suppl 1, 2010. DOI:10.1080/01490419.2010.491029
+ 
+https://climate.nasa.gov/vital-signs/ice-sheets/
+ 
+http://climate.nasa.gov/vital-signs/land-ice/
+ 
+http://nsidc.org/data/G02135
+ 
+ Barnola, J.-M., D. Raynaud, C. Lorius, and N.I. Barkov. 2003. Historical CO2 record from the Vostok ice core. In Trends: A Compendium of Data on Global Change. Carbon Dioxide Information Analysis Center, Oak Ridge National Laboratory, U.S. Department of Energy, Oak Ridge, Tenn., U.S.A.

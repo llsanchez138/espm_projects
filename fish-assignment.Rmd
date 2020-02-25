@@ -1,0 +1,208 @@
+---
+#fish-sharauova-sanchez
+#output: github_document
+---
+
+```{r include = FALSE}
+knitr::opts_chunk$set(message = FALSE)
+
+```
+# Unit 3: Fisheries Collapse Analysis Report
+### Nazerke Sharauova and Latosha Sanchez
+#
+This work focuses on examining the research results of fisheries collapse, reported earlier by [Worm et al](https://doi.org/10.1126/science.1132294). In particular, two analyses were conducted to corroborate the original findings. One evaluates the individual fish taxon Gadus morhua, the North-Atlantic cod, and how the landings of this taxon collapsed in recent years. The other analysis revisits the findings of the original research work on taxa collapse, and validates that the trend in taxa collapse still exists.
+
+## Data for Analysis
+
+To conduct both analyses, we use the data from the [RAM Legacy Stock Assessment Database](https://doi.org/10.5281/zenodo.2542918). In particular, focusing on reported landings and catches, and specifically consider the weight in metric tons (MT) of the total catches (TC).
+
+Below the necessary libraries are loaded, and the datasets needed for the evaluation are downloaded.
+
+```{r message = FALSE}
+library("tidyverse")
+library("readxl")
+
+excel_version <-
+  "RLSADB v4.44/DB Files With Assessment Data/RLSADB v4.44 (assessment data only).xlsx"
+if (!file.exists(excel_version)) {
+  download.file(
+    "https://zenodo.org/record/2542919/files/RLSADB%20v4.44.zip?download=1",
+    "ramlegacy.zip"
+  )
+  unzip("ramlegacy.zip")
+}
+```
+#
+The data is then sorted into callable tables. The names of each table is listed below to verify that they were successfully loaded.
+
+
+```{r}
+sheets <- readxl::excel_sheets(excel_version)
+ram <- lapply(sheets, readxl::read_excel, path = excel_version)
+names(ram) <- sheets
+names(ram)
+```
+
+
+## Investigating North-Atlantic Cod
+
+To conduct an analysis of the North-Atlantic cod, we join the "stock" and "area" tables to the "timeseries" ID column ("tsid"). The desired fish and its corresponding data is filtered out of the table by its scientific name. As a species that has been greatly affected by the collapse, Gadus morhua (North-Atlantic cod) is chosen for analysis. The data is further filtered to encompass only cod from the USA and Canada regions. All the data for the available years have been kept, and the results are shown (Fig. 1).
+   
+```{r}
+
+ram$timeseries %>%
+  left_join(ram$stock) %>%
+  left_join(ram$area) %>%
+  left_join(ram$tsmetrics, by = c("tsid" = "tsunique")) %>%
+  filter(scientificname == "Gadus morhua",
+         country == "USA" | country == "Canada") %>%
+  filter(tsid == "TC-MT") %>%
+  group_by(tsyear) %>%
+  summarize(total_landings = sum(tsvalue, na.rm = TRUE)) %>%
+  ggplot(aes(tsyear, total_landings)) +
+  geom_line(size = .75) +
+  labs(title = "Fish Landings of Atlantic Cod in Metric Tons",
+       y = "Total Landings (MT)",
+       x = "Year",
+       caption = "(Figure 1)") +
+  theme(
+    plot.title = element_text(size = 18, face = 'bold', color = 'steelblue4'),
+    axis.title = element_text(size = 12, color = 'steelblue4', face = 'bold'),
+    axis.text = element_text(size = 11, face = 'bold'),
+    panel.grid.major = element_line(color = 'white', size = 1),
+    panel.grid.minor = element_line(),
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      size = 1), 
+    plot.caption = element_text(
+      color = "black", 
+      face = "italic", 
+      hjust = .90, 
+      size = 10)
+  ) 
+
+ram$timeseries
+```
+#
+Figure 1 evaluates data that pertains to Gadus morhua. The graph made from the analysis solely encompasses the USA and Canada regions. By analyzing the local data, we construct an image from the relevant information acquired, specific to the North-Atlantic cod in Canada and the USA area, as well as stock sizes and specified time series over time. 
+
+As it can be seen from the graph above, the total landings of the cod remain relatively stable from 1850 to 1950. However, the results of the analyzed data depicts a significant rise in the amount of cod (per metric tons) that were acquired following 1950 for several decades before the total landings suddenly decreased just before 2000 and remain at a much lower catch than previously reported.
+
+Beginning in 1950, the total landings noticeably increased with the overall efforts by the fishing industry and rise of fisheries, which ultimately led to a catastrophic collapse of total landings. While there continues to be efforts to combat this issue, such as the use of sustainable fish farming noted in 2000s and again in the 2010s, the decline is still duly noted. 
+
+Gadus morhua constitutes one of the many fish taxa that have collapsed due to overfishing since 2000. Along with the findings from the North-Atlantic cod, we further analyze data from global fish species over a given time series, to identify the overall trend within the large marine ecosystems worldwide. 
+
+
+## Analysis of Stock Collapse
+
+
+In this analysis, we visit the research findings from the article by B. Worm et. al, “Impacts of Biodiversity Loss on Ocean Ecosystem Services” was used to appropriately account for the total taxa collapse. The stock collapse is defined as the drop of the landings/catches below 10% of the previously reported maximum. This analysis examines the stock collapses of various taxa, based on the best time series data present in the RAM database (i.e., TCbest-MT). The research article focuses on the collapse of the stock of various taxa, fish species, and the resulting loss in large marine ecosystems (LME); the research provides valuable data that is used to help construct the shown figures. 
+
+Specific steps for obtaining collapse information included joining stock, area, and timeseries tables, filtering on catch/landings and specific time range [1950-2016]. The data was grouped by the scientific name “taxon” to include the total landings for each species-year complement. To keep the data valid and prevent skewed results, invalid values in total landings are removed. The data is arranged by years to make the table more readable and the cumulative maximum would be accurate in the time series. The cumulative maximum for total landings from 1950-2016, for each given year, were calculated and the years that experienced a stock collapse are marked positive for collapse and kept to be further analysed. 
+
+Additional cleaning removes the preceding years in series per taxon where cumulative maximum remain at zero, cases were data are not recorded are also removed, until only non-zero landings remain. By grouping the unique year with [collapse/non-collapse] pairs, the series of collapses and non-collapse can be counted and summarized; following this, the data is again grouped by year. This process gives the total collapses per year divided by total taxa recorded in that year. The code and results are presented below.
+
+
+
+
+```{r}
+collapse_data <-
+  ram$timeseries %>%
+  left_join(ram$stock) %>%
+  left_join(ram$area) %>%
+  left_join(ram$tsmetrics, by = c("tsid" = "tsunique")) %>%
+  filter(tsid == "TCbest-MT") %>%
+  filter(tscategory == "CATCH or LANDINGS") %>%
+  filter(tsyear > 1949, tsyear < 2017) %>%
+  group_by(scientificname, tsyear) %>%
+  summarize(total_landings = sum(tsvalue, na.rm = TRUE)) %>%
+  filter(!is.na(total_landings)) %>%
+  arrange(tsyear) %>%
+  mutate(cummax = cummax(total_landings)) %>%
+  mutate(collapsed = total_landings < 0.1 * cummax) %>%
+  filter(cummax != 0) %>%
+  group_by(tsyear, collapsed) %>%
+  summarize(
+    collapsed_taxa = sum(collapsed == TRUE),
+    noncollapsed_taxa = sum(collapsed == FALSE)
+  ) %>%
+  group_by(tsyear) %>%
+  summarize(
+    total_taxa = sum(collapsed_taxa + noncollapsed_taxa),
+    collapsed_taxa = sum(collapsed_taxa)
+  ) %>%
+  mutate(collapsed_percent = collapsed_taxa / total_taxa * 100)
+collapse_data
+
+```
+
+#
+The table above verifies that the number of collapsed taxa, and taxa as a whole, were accounted for each year, as well as the relative percentages. 
+
+
+
+```{r}
+collapse_data %>%
+  ggplot(aes(tsyear, collapsed_percent)) +
+  geom_point(
+    shape = 23,
+    fill = "black",
+    color = "deepskyblue4",
+    size = 2
+  ) +
+  scale_y_reverse() +
+  labs(title = "Global Loss of Species",
+       y = "Collapsed taxa (%)",
+       x = "Year",
+       caption = "(Figure 2)") +
+  theme(
+    plot.title = element_text(size = 18, face = 'bold', 
+                              color = 'dodgerblue4'),
+    axis.title = element_text(size = 12, color = 'dodgerblue4', 
+                              face = 'bold'),
+    axis.text = element_text(size = 11, face = 'bold'),
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(colour = "black"),
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      size = 1), 
+    plot.caption = element_text(
+      color = "black", 
+      face = "italic", 
+      hjust = .8,
+      size = 10)) +
+  geom_point() +
+  stat_smooth(
+    method = "auto",
+    se = FALSE,
+    color = 'red3',
+    size = .75
+  )
+```
+
+#
+Figure 2 shows the percentage of collapsed taxa, for stock, by year. The red line further displays the trend in the trajectory of the collapse, marked from 1949-2017.
+
+By extracting landings data from a variety of species of fish, we can illustrate the global loss and collapse of the species over time. In agreement with the original research work, the results clearly indicate an alarming rate of collapse - 21%-26% in most recent years. When setting the end year to 2006, it can be seen that the results were around 10%-12%, the difference here being in the methodology of aggregating the data per large marine ecosystems(LME), found in the original work, compared to the current available data that has been shown in this report. If the methodology of the original research work was applied today, it very well might lead to an even higher percent collapsed taxa than the 29% that was reported previously. This demonstrates that the stock collapse rates might have accelerated significantly in 64 LMEs.
+
+
+
+#
+# References:
+# 
+
+Worm, B., Barbier, E. B., Beaumont, N., Duffy, E. J., Folke, C., Halpern, B. S., ... Watson, R. (2006, November 3). Impacts of Biodiversity Loss on Ocean Ecosystem Services. AAS Science, 314(5800), 787-790. doi:10.1126/science.1132294
+
+Ricard, D., Minto, C., Jensen, O.P. and Baum, J.K. 2013. Evaluating the knowledge base and status of commercially exploited marine species with the RAM Legacy Stock Assessment Database. Fish and Fisheries 13 (4) 380-398. DOI: https://doi.org/10.1111/j.1467-2979.2011.00435.x
+
+Worm, B. (2016). Averting a global fisheries disaster. Proceedings of the National Academy of Sciences, 201604008. https://doi.org/10.1073/pnas.1604008113
+
+
+
+
+
+
